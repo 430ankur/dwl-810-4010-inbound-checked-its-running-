@@ -1,0 +1,173 @@
+%dw 2.0
+import substring from dw::core::Strings
+
+output application/xml
+ns ns0 http://xmlns.Emerson.com/InvoiceOutEBM
+ns ns01 http://xmlns.Emerson.com/InvoiceOutEBO
+---
+{//some elements like CustItemNo are not coming empty in my case?
+	ns0#InvoiceOutEBM: {
+		(payload.TransactionSets.v004010."810" map ( v810 , indexOfV810 ) -> {
+			
+			ns0#EBMHeader:{
+				
+				ns0#ApplicationArea:{
+					ns01#MessageDetails:{
+				ns01#ActionName:"INSERT",
+				ns01#MessageID:uuid(),
+				
+			},
+			
+			ns01#Properties:{
+				
+				
+					ns01#Property @(Name: "TPName"):"NIDEC WR CANADA" 
+				
+			}
+			
+			
+			
+			}},
+			
+			
+			
+			ns0#DataArea: {
+				ns0#InvoiceOutData: {
+					ns01#InvoiceNumber: v810.Heading."020_BIG".BIG02,
+					ns01#InvoiceDate: 
+					
+					substring(v810.Heading."020_BIG".BIG01,0,4) ++ substring(v810.Heading."020_BIG".BIG01,5,7) ++ substring(v810.Heading."020_BIG".BIG01,8,10),
+				
+					
+					ns01#CustomerPONumber: v810.Heading."020_BIG".BIG04,
+				
+					ns01#CustomerPODate:
+					substring(v810.Heading."020_BIG".BIG03,0,4) ++ substring(v810.Heading."020_BIG".BIG03,5,7) ++ substring(v810.Heading."020_BIG".BIG03,8,10),
+					
+					
+				
+					
+					ns01#DeliveryRef: "S810",
+					ns01#InvTotalAmount: (v810.Summary."010_TDS".TDS01 as Number)*100,//check format
+					
+					ns01#CustEDIId:v810.Interchange.ISA08 ,
+					
+					ns01#SenderId:v810.Interchange.ISA06,
+					
+					(v810.Heading."070_N1_Loop" map(v1,index1)->	
+			
+	{
+						(if ( v1."070_N1".N101=="SF" ) {
+							(v1."090_N3" map(v2,index2)->	{
+								ns01#BillToAddr1: v2.N301,//didnt appear at all but it wont appear
+								ns01#BillToAddr2: v2.N302,//didnt appear at all but it wont appear
+							}),
+							ns01#BillToName: v1."070_N1".N102,
+							ns01#BillToCity: v1."100_N4".N402,
+							ns01#BillToState: v1."100_N4".N403,
+							ns01#BillToZip: v1."100_N4".N404,
+							
+								ns01#ShipToEDILoc: v1."070_N1".N104,
+						}	
+		else null),
+						(if ( v1."070_N1".N101=="ST" ) ns01#ShipToName: v1."070_N1".N102 else null),
+						(if ( v1."070_N1".N101=="RE" ) {
+							ns01#RemitToName: v1."100_N4"."070_N1".N102,
+							(v1."090_N3" map(v3,index3)->	{
+								ns01#RemitToAddr1: v3.N301,//didnt appear both in our output(postman) and output xml
+								ns01#RemitToAddr2: v3.N302//didnt appear both in our output(postman) and output xml
+							}),
+							ns01#RemitToCity: v1."100_N4".N402,//didnt appear both in our output(postman) and output xml
+							ns01#RemitToState: v1."100_N4".N403,//didnt appear both in our output(postman) and output xml
+							ns01#RemitToZip: v1."100_N4".N404//didnt appear both in our output(postman) and output xml
+						}	
+		else null)
+					}),
+					(v810.Detail."010_IT1_Loop" map(v4,index4)->{
+						
+							ns01#SalesTaxAmount: v4."010_IT1".TX102,
+						
+					}),
+					(v810.Heading."130_ITD" map(v6,index6)->{
+						ns01#TermsDiscPercent: v6.ITD03,
+						
+						ns01#TermsDiscDueDate:
+					substring(v6.ITD04,0,4) ++ substring(v6.ITD04,5,7) ++ substring(v6.ITD04,8,10) default "",	
+						
+						
+						
+						
+						
+						
+						
+						
+						/*ns01#TermsDiscDueDate: (v6.ITD04 as String) as  Date{
+						format:"yyyyMMdd"
+					}  default "",*/
+						ns01#TermsDiscDaysDue: v6.ITD05,
+						ns01#TermsDiscAmount: v6.ITD08
+					}),
+					ns01#Attribute1: v810.Heading."040_CUR".CUR02,
+					ns01#Attribute4:v810.Interchange.ISA08 ,
+					(v810.Heading."050_REF" map(v7,index7)->{
+						(if ( v7.REF01=="BM" ) ns01#Attribute3: v7.REF02 else null) 
+					}),
+				
+					
+				
+					(v810.Detail."010_IT1_Loop" map(v8,i8)->{
+						ns01#InvoiceDetail:{
+					ns01#InvoiceNumber: v810.Heading."020_BIG".BIG02,
+						ns01#CustEDIId:v810.Interchange.ISA06,
+					
+						ns01#InvoiceLineNumber:v8."010_IT1".IT101,
+						ns01#EMRItemNumber:v8."010_IT1".IT109,// multiple
+						
+						
+						ns01#InvoiceLineQty:v8."010_IT1".IT102,
+						ns01#UnitPrice:v8."010_IT1".IT104,
+						
+						ns01#Attribute2:((v8."010_IT1".IT102 as Number{format:"#.####"})*(v8."010_IT1".IT104 as Number{format:"#.####"})),
+						
+						ns01#Attribute1:v8."010_IT1".IT103,
+						
+						
+						(if ( v8."010_IT1".IT106=="PI" ) ns01#EMRItemNumber:v8."010_IT1".IT107 
+						
+						else if ( v8."010_IT1".IT108=="PI" ) ns01#EMRItemNumber:v8."010_IT1".IT109 
+						
+							else if ( v8."010_IT1".IT110=="PI" ) ns01#EMRItemNumber:v8."010_IT1".IT111 
+						
+						else ns01#EMRItemNumber:null),
+						
+						
+							
+						(if ( v8."010_IT1".IT106=="VC" ) ns01#CustItemNo:v8."010_IT1".IT107 //it is right but in output xml there might be mismatch
+						
+						else if ( v8."010_IT1".IT108=="VC" ) ns01#CustItemNo:v8."010_IT1".IT109 
+						
+							else if ( v8."010_IT1".IT110=="VC" ) ns01#CustItemNo:v8."010_IT1".IT111 
+						
+						else ns01#CustItemNo:null),
+						
+						
+						
+						
+						
+						
+						
+						(v8."060_PID_Loop" map(v9,i9)->{
+						
+						ns01#ItemDescription:v9."060_PID".PID05 as String,
+					})
+						}
+					})
+					
+					
+					
+					
+				}
+			}
+		})
+	}
+}
